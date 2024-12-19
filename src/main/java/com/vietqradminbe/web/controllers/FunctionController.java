@@ -77,7 +77,7 @@ public class FunctionController {
             logger.info(FunctionController.class + ": INFO: getFunctions: " + functions.toString()
                     + " at: " + System.currentTimeMillis());
             response.setCode(200);
-            response.setMessage("Create successfully!");
+            response.setMessage("Get successfully!");
             response.setResult(functions);
             return ResponseEntity.status(HttpStatus.OK).body(response);
         } catch (BadRequestException e) {

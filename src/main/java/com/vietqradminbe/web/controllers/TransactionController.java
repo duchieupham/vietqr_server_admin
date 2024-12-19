@@ -2,6 +2,7 @@ package com.vietqradminbe.web.controllers;
 
 import com.vietqradminbe.application.services.ActivityUserLogService;
 import com.vietqradminbe.application.services.UserService;
+import com.vietqradminbe.application.services.grpc.TransactionReceiveServiceClient;
 import com.vietqradminbe.domain.exceptions.BadRequestException;
 import com.vietqradminbe.domain.exceptions.ErrorCode;
 import com.vietqradminbe.domain.models.ActivityUserLog;
@@ -35,6 +36,7 @@ public class TransactionController {
     static Logger logger = Logger.getLogger(TransactionController.class);
 
     TransactionService transactionService;
+    TransactionReceiveServiceClient transactionReceiveServiceClient;
     JwtUtil jwtUtil;
     UserService userService;
     ActivityUserLogService activityUserLogService;
@@ -177,6 +179,62 @@ public class TransactionController {
             String authorizationHeader = currentRequest.getHeader("Authorization");
             String token = null;
             TransactionReceivePaginationResponseDTO transResponse = transactionService.getTransactionsWithPaginationByOption(filterTransactionRequest);
+
+
+            if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+                token = authorizationHeader.substring(7);  // Remove "Bearer " prefix
+
+                //lay username tu token va lay user tu username
+                String username = jwtUtil.extractUsernameFromToken(token.replace("Bearer ", ""));
+                User user = userService.getUserByUsername(username);
+
+                ActivityUserLog activityUserLog = new ActivityUserLog();
+                activityUserLog.setUsername(username);
+                activityUserLog.setId(UUID.randomUUID().toString());
+                activityUserLog.setEmail(user.getEmail());
+                activityUserLog.setFirstname(user.getFirstname());
+                activityUserLog.setLastname(user.getLastname());
+                activityUserLog.setPhoneNumber(user.getPhoneNumber());
+                activityUserLog.setTimeLog(TimeHelperUtil.getCurrentTime());
+                activityUserLog.setUser(user);
+                activityUserLog.setActionJson(transResponse.toString());
+                activityUserLog.setGroupFunctionId("6fcdc4d1-f3f7-4862-bdc7-bfef31194fb6");
+                activityUserLog.setFunctionId("2e4c4a4c-3fd6-4231-b780-a0865490a8e0");
+                activityUserLog.setDescription("User :" + user.getUsername() + " " + user.getEmail() + " " + user.getFirstname() + " " + user.getLastname() + " " + user.getPhoneNumber() + " have just get all users at " + TimeHelperUtil.getCurrentTime());
+                activityUserLogService.createActivityUserLog(activityUserLog);
+            }
+
+            logger.info(TransactionController.class + ": INFO: trans: " + transResponse.toString()
+                    + " at: " + System.currentTimeMillis());
+            response.setCode(200);
+            response.setMessage("Get successfully!");
+            response.setResult(transResponse);
+            return ResponseEntity.status(HttpStatus.OK).body(response);
+        } catch (ExpiredJwtException e) {
+            throw new BadRequestException(ErrorCode.TOKEN_EXPIRED);
+        } catch (Exception e) {
+            logger.error(TransactionController.class + ": ERROR: trans: " + e.getMessage()
+                    + " at: " + System.currentTimeMillis());
+            response.setCode(500);
+            response.setMessage("E1005");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+
+    @PostMapping("/transactions/v3/demo-grpc")
+    public ResponseEntity<APIResponse<TransactionReceivePaginationResponseDTO>> getTransactionsV3GRPC(
+            @RequestBody RequestFilterTransactionRequest filterTransactionRequest
+    ) {
+        APIResponse<TransactionReceivePaginationResponseDTO> response = new APIResponse<>();
+        try {
+            HttpServletRequest currentRequest = ((ServletRequestAttributes) RequestContextHolder
+                    .getRequestAttributes()).getRequest();
+
+            // Extract Bearer token from the Authorization header
+            String authorizationHeader = currentRequest.getHeader("Authorization");
+            String token = null;
+            TransactionReceivePaginationResponseDTO transResponse = transactionReceiveServiceClient.getTransactionsWithPaginationByOption(filterTransactionRequest);
 
 
             if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
